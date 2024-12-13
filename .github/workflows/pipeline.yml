@@ -77,7 +77,7 @@ jobs:
         with:
             issue-title: "Deploying dev"
             issue-body: "Please approve or deny the deployment of dev"
-            exclude-workflow-initiator-as-approver: false
+            exclude-workflow-initiator-as-approver: true
 
       - name: Checkout
         uses: actions/checkout@v3
