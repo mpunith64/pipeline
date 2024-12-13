@@ -1,0 +1,128 @@
+name: 'Build and Deploy app'
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - feature/*
+      - develop
+      - master
+
+jobs:
+  autoTag:
+    name: 'Auto-tag'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.taggerDryRun.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
+      - name: Patch version for each merge
+        id: taggerDryRun
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.githubToken }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+          DRY_RUN: ${{ github.ref != 'refs/heads/master' }} # will dry run if not master
+
+  docker:
+    name: Build Docker Images
+    needs: [autoTag]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build docker image
+        run: |
+          echo "docker build -t my image ${{ vars.service_name }}:${{ needs.autoTag.outputs.version }}"
+
+
+      - name: Push docker image
+        run: |
+          echo "docker push ${{ vars.service_name }}:${{ needs.autoTag.outputs.version }}"
+
+  deploy-do:
+    if: startsWith(github.ref, 'refs/heads/feature/')
+    name: 'Deploy to DO Environment'
+    runs-on: ubuntu-latest
+    environment: do
+    needs: docker
+    steps:
+      - name: Manual Approval
+        uses: hmarr/auto-approve-action@v2
+        with:
+          timeout-minutes: 30
+
+      - name: Sync ArgoCD Application
+        run: echo "sync do"
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop'
+    name: 'Deploy to dev Environment'
+    runs-on: ubuntu-latest
+    environment: test
+    needs: [docker]
+    steps:
+      - name: Await manual approval for tests
+        uses: actions/github-script@v6
+        with:
+          script: |
+            console.log("Waiting for approval to proceed with testing...");
+            // Simulating manual approval
+            console.log("Approval for tests granted.");
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Sync argocd application to current version
+        run: |
+          echo "sync dev"
+
+  deploy-sit:
+    if: github.ref == 'refs/heads/master'
+    name: 'Deploy to sit Environment'
+    runs-on: ubuntu-latest
+    environment: sit
+    needs: [docker]
+    steps:
+      - name: Waiting for approval
+        uses: trstringer/manual-approval@v1
+        with:
+          timeout-minutes: 30
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Sync argocd application to current version
+        run: |
+          echo "sync sit"
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/master'
+    name: 'Deploy to e2e Environment'
+    runs-on: ubuntu-latest
+    environment: e2e
+    needs: [docker]
+    steps:
+      - name: Waiting for approval
+        uses: trstringer/manual-approval@v1
+        with:
+          timeout-minutes: 30
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Sync argocd application to current version
+        run: |
+          echo "manual sync prod"
