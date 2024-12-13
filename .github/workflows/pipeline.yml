@@ -73,12 +73,11 @@ jobs:
     needs: [docker]
     steps:
       - name: Await manual approval for tests
-        uses: actions/github-script@v6
+        uses: trstringer/manual-approval@v1
         with:
-          script: |
-            console.log("Waiting for approval to proceed with testing...");
-            // Simulating manual approval
-            console.log("Approval for tests granted.");
+            issue-title: "Deploying dev"
+            issue-body: "Please approve or deny the deployment of dev"
+            exclude-workflow-initiator-as-approver: false
 
       - name: Checkout
         uses: actions/checkout@v3
