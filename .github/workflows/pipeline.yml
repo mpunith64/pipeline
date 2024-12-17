@@ -50,12 +50,22 @@ jobs:
         run: |
           echo "docker push ${{ vars.service_name }}:${{ needs.autoTag.outputs.version }}"
 
+  Approval-for-do:
+    name: 'Approval'
+    runs-on: ubuntu-latest
+    needs:
+      - docker
+    environment: role
+    steps:
+      - name: approval
+        run: echo "Approved for deployment"
+
   deploy-do:
     if: startsWith(github.ref, 'refs/heads/feature/')
     name: 'Deploy to DO Environment'
     runs-on: ubuntu-latest
     environment: do
-    needs: docker
+    needs: Approval-for-do
     steps:
       - name: Manual Approval
         uses: hmarr/auto-approve-action@v2
@@ -64,13 +74,23 @@ jobs:
 
       - name: Sync ArgoCD Application
         run: echo "sync do"
+  
+  Approval-for-dev:
+    name: 'Approval'
+    runs-on: ubuntu-latest
+    needs:
+      - deploy-do
+    environment: role
+    steps:
+      - name: approval
+        run: echo "Approved for deployment"
 
   deploy-dev:
     if: github.ref == 'refs/heads/develop'
     name: 'Deploy to dev Environment'
     runs-on: ubuntu-latest
     environment: test
-    needs: [docker]
+    needs: Approval-for-dev
     steps:
       - name: Await manual approval for tests
         uses: trstringer/manual-approval@v1
