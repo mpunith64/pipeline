@@ -1,0 +1,31 @@
+name: Version Bump
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Automated Version Bump
+        id: version-bump
+        uses: 'phips28/gh-action-bump-version@master'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PACKAGES_ACCESS_TOKEN }}
+          PACKAGEJSON_DIR: './'  # Root directory
+       with:
+         skip-tag: 'true'
+         commit-message: 'CI: bumps version to {{version}} [skip ci]'
+
+      - name: Push Changes
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git push
